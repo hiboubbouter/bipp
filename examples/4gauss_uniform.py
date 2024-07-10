@@ -465,7 +465,6 @@ print("lsq_image.shape =", lsq_image.shape)
 
 #############################################
 I_lsq_eq_summed = s2image.Image(lsq_image.reshape(args.nlevel,lsq_image.shape[-2], lsq_image.shape[-1]).sum(axis = 0), xyz_grid)
-I_lsq_eq_summed = I_lsq_eq_summed/n_factor
 
 
 
