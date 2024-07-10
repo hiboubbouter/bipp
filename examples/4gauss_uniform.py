@@ -382,7 +382,10 @@ def weighting(u, v, xedges, yedges, counts):
     y_idx = np.digitize(v, yedges) - 1
     x_idx = np.clip(x_idx, 0, len(xedges)-2)# N-1)
     y_idx = np.clip(y_idx, 0, len(yedges)-2)#N-1)
-    return counts[x_idx, y_idx], x_idx, y_idx   
+    for i in range(len(u)):
+        if u[i]<xedges[0] or u[i]>xedges[-1] or v[i]<yedges[0] or v[i]>yedges[-1]:
+            assigned_weights[i] = 0.0
+    return assigned_weights  
 
 
 def normalize_by_non_empty_uv_cells(visibilities, counts, x_idx, y_idx):
@@ -419,7 +422,7 @@ print('gridding')
 xedges, yedges, counts, inv_counts  = gridding(N, du, uu, vv)
 
 n_factor = float(np.count_nonzero(counts))
-print("nfactor=",n_factor)
+print("non zero cells=",n_factor)
 print('imaging')
 #timeEnd = 20
 #########################################################################################
@@ -439,7 +442,7 @@ for t, f, S in ProgressBar(
         continue
     new_S = S.data.T.reshape(-1, order="F")
     ut, vt, wt = uvw.T
-    w,x_idx, y_idx = weighting(ut, vt, xedges, yedges, inv_counts)
+    w = weighting(ut, vt, xedges, yedges, inv_counts)
     #new_S = np.full(new_S.shape, 1 + 1j)*w#new_S*w
     new_S = new_S*w#/n_factor
     new_S = new_S.reshape((S.data.shape[0], S.data.shape[0]), order="F").T
