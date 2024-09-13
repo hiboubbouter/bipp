@@ -27,15 +27,10 @@ import matplotlib.cm as cm
 from matplotlib.colors import TwoSlopeNorm
 from matplotlib.colors import LogNorm
 from mpl_toolkits.axes_grid1 import make_axes_locatable
-
 import subprocess
-
 from tqdm import tqdm
-#from casatools import table
-from scipy.sparse import lil_matrix
-from scipy.ndimage import gaussian_filter
 
-#import gridding as grd
+
 
 
 
@@ -410,8 +405,8 @@ vv = np.array(vv)
 
 ###################### gridding
 N = args.npix
-fov = args.fov * (np.pi / 180)
-du = 1/fov / wl
+fov = args.fov
+du = 1/fov*wl
 
 print('gridding')
 xedges, yedges, counts, inv_counts  = gridding(N, du, uu, vv)
