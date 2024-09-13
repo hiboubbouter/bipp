@@ -388,32 +388,27 @@ def weighting(u, v, xedges, yedges, counts):
     return assigned_weights  
 
 
-def normalize_by_non_empty_uv_cells(visibilities, counts, x_idx, y_idx):
-    non_empty_cells = np.count_nonzero(counts)
-    if non_empty_cells != 0:
-        normalization_factor = np.sum(visibilities) / non_empty_cells
-        normalized_visibilities = visibilities / normalization_factor
-    else:
-        normalized_visibilities = visibilities
-    return normalized_visibilities
 ##########################################################################
 ###########################
+
+###################### extract uv
 print('getting uv')
 uu = []
 vv = []
-for t, q, S in ProgressBar(
+for t, f, S in ProgressBar(
         ms.visibilities(channel_id=channel_id, time_id=slice(timeStart, timeEnd, 1), column=args.column)
 ):
+    wl = constants.speed_of_light / f.to_value(u.Hz)
     UVW_baselines_t = ms.instrument.baselines(t, uvw=True, field_center=ms.field_center)
     uvw = frame.reshape_and_scale_uvw(wl, UVW_baselines_t)
     ut, vt, wt = uvw.T
     uu.extend(ut)
     vv.extend(vt)
-    wl = constants.speed_of_light / f.to_value(u.Hz)
-
+    
 uu = np.array(uu)
 vv = np.array(vv)
 
+###################### gridding
 N = args.npix
 fov = args.fov * (np.pi / 180)
 du = 1/fov / wl
@@ -421,11 +416,12 @@ du = 1/fov / wl
 print('gridding')
 xedges, yedges, counts, inv_counts  = gridding(N, du, uu, vv)
 
-n_factor = float(np.count_nonzero(counts))
-print("non zero cells=",n_factor)
+#n_factor = float(np.count_nonzero(counts))
+#print("non zero cells=",n_factor)
 print('imaging')
-#timeEnd = 20
+
 #########################################################################################
+###########################
 for t, f, S in ProgressBar(
         ms.visibilities(channel_id=channel_id, time_id=slice(timeStart, timeEnd, 1), column=args.column)
 ):
@@ -435,20 +431,23 @@ for t, f, S in ProgressBar(
     W = ms.beamformer(XYZ, wl)
     S, W = measurement_set.filter_data(S, W)
 
-
     UVW_baselines_t = ms.instrument.baselines(t, uvw=True, field_center=ms.field_center)
     uvw = frame.reshape_and_scale_uvw(wl, UVW_baselines_t)
     if np.allclose(S.data, np.zeros(S.data.shape)):
         continue
+    ##### un comment for uniform weighting
+    #imager.collect(wl, fi, S.data, W.data, XYZ.data, uvw)
+
+    ###################### weighting the visibility with the grid
     new_S = S.data.T.reshape(-1, order="F")
     ut, vt, wt = uvw.T
     w = weighting(ut, vt, xedges, yedges, inv_counts)
+    #### un comment for getting the psf
     #new_S = np.full(new_S.shape, 1 + 1j)*w#new_S*w
-    new_S = new_S*w#/n_factor
+    new_S = new_S*w
     new_S = new_S.reshape((S.data.shape[0], S.data.shape[0]), order="F").T
-    #imager.collect(N_eig, wl, intensity_intervals, W.data, XYZ.data, uvw, new_S+1j*np.imag(S.data))
     imager.collect(wl, fi, new_S, W.data, XYZ.data, uvw)
-    #imager.collect(wl, fi, S.data, W.data, XYZ.data, uvw)
+    
 
 
 
