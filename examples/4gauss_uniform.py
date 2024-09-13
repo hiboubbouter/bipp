@@ -430,7 +430,7 @@ for t, f, S in ProgressBar(
     uvw = frame.reshape_and_scale_uvw(wl, UVW_baselines_t)
     if np.allclose(S.data, np.zeros(S.data.shape)):
         continue
-    ##### un comment for uniform weighting
+    ##### un comment for natural weighting
     #imager.collect(wl, fi, S.data, W.data, XYZ.data, uvw)
 
     ###################### weighting the visibility with the grid
