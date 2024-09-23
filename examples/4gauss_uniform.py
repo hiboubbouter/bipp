@@ -413,9 +413,10 @@ print('gridding')
 xedges, yedges, counts, inv_counts  = gridding(N, du, uu, vv)
 
 n_factor = float(np.count_nonzero(counts))
-#print("non zero cells=",n_factor)
+print("non zero cells=",n_factor)
 print('imaging')
 
+W_glob = 0
 #########################################################################################
 ###########################
 for t, f, S in ProgressBar(
@@ -438,13 +439,14 @@ for t, f, S in ProgressBar(
     new_S = S.data.T.reshape(-1, order="F")
     ut, vt, wt = uvw.T
     w = weighting(ut, vt, xedges, yedges, inv_counts)
+    W_glob += np.sum(w)
     #### un comment for getting the psf
     #new_S = np.full(new_S.shape, 1 + 1j)*w#new_S*w
     new_S = new_S*w
     new_S = new_S.reshape((S.data.shape[0], S.data.shape[0]), order="F").T
     imager.collect(wl, fi, new_S, W.data, XYZ.data, uvw)
     
-
+print("sum of w=",W_glob)
 
 
 images = imager.get().reshape((-1, args.npix, args.npix))
@@ -460,7 +462,7 @@ print("lsq_image.shape =", lsq_image.shape)
 
 #############################################
 I_lsq_eq_summed = s2image.Image(lsq_image.reshape(args.nlevel,lsq_image.shape[-2], lsq_image.shape[-1]).sum(axis = 0), xyz_grid)
-I_lsq_eq_summed = I_lsq_eq_summed/n_factor
+I_lsq_eq_summed = I_lsq_eq_summed/W_glob
 
 
 
