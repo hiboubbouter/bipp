@@ -377,6 +377,7 @@ def weighting(u, v, xedges, yedges, counts):
     y_idx = np.digitize(v, yedges) - 1
     x_idx = np.clip(x_idx, 0, len(xedges)-2)# N-1)
     y_idx = np.clip(y_idx, 0, len(yedges)-2)#N-1)
+    assigned_weights = counts[x_idx, y_idx]
     for i in range(len(u)):
         if u[i]<xedges[0] or u[i]>xedges[-1] or v[i]<yedges[0] or v[i]>yedges[-1]:
             assigned_weights[i] = 0.0
