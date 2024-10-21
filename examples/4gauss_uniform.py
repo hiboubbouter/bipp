@@ -264,6 +264,7 @@ else:
 
 
 wl = constants.speed_of_light / frequency.to_value(u.Hz)
+wlg = constants.speed_of_light / frequency.to_value(u.Hz)
 print (f"wl:{wl}; f: {frequency}")
 
 if (args.grid == "ms"):
@@ -310,7 +311,14 @@ opt.set_collect_group_size(None)
 #opt.set_local_uvw_partition(bipp.Partition.none()) # Commented out
 opt.set_local_image_partition(bipp.Partition.grid([1,1,1]))
 opt.set_local_uvw_partition(bipp.Partition.grid([args.partition,args.partition,1]))
+
+# to activate/desactivate for natural/uniform weighting
+#################################################################
 opt.set_normalize_image_by_nvis(False)
+opt.set_normalize_image(False)
+################################################################
+
+
 #opt.set_local_image_partition(bipp.Partition.auto())
 #opt.set_local_uvw_partition(bipp.Partition.auto())
 print("N_pix = ", args.npix)
@@ -375,8 +383,8 @@ def gridding(N, du, u, v):
 def weighting(u, v, xedges, yedges, counts):
     x_idx = np.digitize(u, xedges) - 1
     y_idx = np.digitize(v, yedges) - 1
-    x_idx = np.clip(x_idx, 0, len(xedges)-2)# N-1)
-    y_idx = np.clip(y_idx, 0, len(yedges)-2)#N-1)
+    x_idx = np.clip(x_idx, 0, len(xedges)-2)
+    y_idx = np.clip(y_idx, 0, len(yedges)-2)
     assigned_weights = counts[x_idx, y_idx]
     for i in range(len(u)):
         if u[i]<xedges[0] or u[i]>xedges[-1] or v[i]<yedges[0] or v[i]>yedges[-1]:
@@ -405,16 +413,30 @@ uu = np.array(uu)
 vv = np.array(vv)
 
 ###################### gridding
+print('len uu=', len(uu))
+
+print('max u = ',np.max(uu))
+print('min u = ',np.min(uu))
+
 N = args.npix
 fov = args.fov
-du = 1/fov*wl
+print('N = ',N)
+print('fov rad = ', fov)
 
+
+print('wl = ', wlg)
+du = 1/fov * wlg
+print('du = ',du)
 print('gridding')
 xedges, yedges, counts, inv_counts  = gridding(N, du, uu, vv)
+print('max xedges = ', np.max(xedges))
+print('max yedges = ', np.max(yedges))
 
+ww = weighting(uu, vv, xedges, yedges, inv_counts)
 n_factor = float(np.count_nonzero(counts))
-print("non zero cells=",n_factor)
-print('imaging')
+print("non zero cells = ",n_factor)
+
+print('sum of the weights = ', np.sum(ww))
 
 W_glob = 0
 #########################################################################################
@@ -462,7 +484,12 @@ print("lsq_image.shape =", lsq_image.shape)
 
 #############################################
 I_lsq_eq_summed = s2image.Image(lsq_image.reshape(args.nlevel,lsq_image.shape[-2], lsq_image.shape[-1]).sum(axis = 0), xyz_grid)
-I_lsq_eq_summed = I_lsq_eq_summed/W_glob
+
+# I_lsq_eq_summed should be divided b W_glob
+# I_lsq_eq_summed = I_lsq_eq_summed / W_glob
+# but it returns the error:
+# TypeError: unsupported operand type(s) for /: 'Image' and 'float'
+# Instead do it manually after 
 
 
 
