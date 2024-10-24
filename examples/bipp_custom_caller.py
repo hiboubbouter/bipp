@@ -422,9 +422,10 @@ class bipp_custom:
                 new_S = new_S*w_okay
                 new_S = new_S.reshape((S.data.shape[0], S.data.shape[0]), order="F").T
                 self.imager.collect(wl, self.fi, new_S, W.data, XYZ.data, uvw)
-            print('sum of the weights = ', teimp)
+            print('sum of the weights = ', temp)
         ###
         if weighting == 'natural':
+                print('Natural weighting')
                 for t, f, S in ProgressBar(
                         self.ms.visibilities(channel_id=self.channel_id, time_id=slice(self.timeStart, self.timeEnd, n), column=self.column)
                 ):
@@ -501,6 +502,54 @@ class bipp_custom:
 
 ########################################################################################
     def dirty(self, weighting='uniform', n=1, save=True):
+        
+        self.observations_set_up()
+        self.gridder()
+        self.gram()
+        self.set_up_nufft(weighting)
+        self.parameter_estimation()
+        self.def_imaging()
+        
+        if weighting == 'uniform':
+            self.get_uv(n)
+            self.du = 1/self.fov * self.wl
+            self.xedges, self.yedges, self.counts, self.inv_counts  = self.uv_grid(self.npix, self.du, self.uu, self.vv)
+            self.non_empty_cells = float(np.count_nonzero(self.counts))
+        
+            self.imaging(weighting, n)
+            images = self.imager.get().reshape((-1, self.npix, self.npix))
+            self.lsq_image = self.fi.get_filter_images("lsq", images)
+            self.std_image = self.fi.get_filter_images("std", images)
+            
+            self.lsq_image.data = self.lsq_image.data / self.non_empty_cells
+            self.std_image.data = self.std_image.data / self.non_empty_cells
+            
+            self.I_lsq_eq = s2image.Image(self.lsq_image, self.xyz_grid)
+            self.I_std_eq = s2image.Image(self.std_image, self.xyz_grid)
+            self.I_lsq_eq_summed = s2image.Image(self.lsq_image.reshape(self.nlevel+1,self.lsq_image.shape[-2], self.lsq_image.shape[-1]).sum(axis = 0), self.xyz_grid)
+            self.I_std_eq_summed = s2image.Image(self.std_image.reshape(self.nlevel+1,self.std_image.shape[-2], self.std_image.shape[-1]).sum(axis = 0), self.xyz_grid)
+
+            self.I_lsq_eq_summed.data = self.I_lsq_eq_summed.data / self.non_empty_cells
+            self.I_std_eq_summed.data = self.I_std_eq_summed.data / self.non_empty_cells
+        
+        if weighting == 'natural':
+        
+            self.imaging(weighting, n)
+            images = self.imager.get().reshape((-1, self.npix, self.npix))
+            self.lsq_image = self.fi.get_filter_images("lsq", images)
+            self.std_image = self.fi.get_filter_images("std", images)
+            self.I_lsq_eq = s2image.Image(self.lsq_image, self.xyz_grid)
+            self.I_std_eq = s2image.Image(self.std_image, self.xyz_grid)
+            self.I_lsq_eq_summed = s2image.Image(self.lsq_image.reshape(self.nlevel+1,self.lsq_image.shape[-2], self.lsq_image.shape[-1]).sum(axis = 0), self.xyz_grid)
+            self.I_std_eq_summed = s2image.Image(self.std_image.reshape(self.nlevel+1,self.std_image.shape[-2], self.std_image.shape[-1]).sum(axis = 0), self.xyz_grid)
+            
+            
+        if save == True:
+            self.save_fits()
+
+########################################################################################
+    def psf(self, weighting, n=1, save=True):
+        
         self.observations_set_up()
         self.gridder()
         self.gram()
@@ -514,18 +563,105 @@ class bipp_custom:
             self.du = 1/self.fov * self.wl
             self.xedges, self.yedges, self.counts, self.inv_counts  = self.uv_grid(self.npix, self.du, self.uu, self.vv)
             self.non_empty_cells = float(np.count_nonzero(self.counts))
+        
+            self.imaging_psf(weighting, n)
+            images = self.imager.get().reshape((-1, self.npix, self.npix))
+            self.lsq_image = self.fi.get_filter_images("lsq", images)
+            self.std_image = self.fi.get_filter_images("std", images)
             
-        self.imaging(weighting, n)
-        images = self.imager.get().reshape((-1, self.npix, self.npix))
-        lsq_image = self.fi.get_filter_images("lsq", images)
-        std_image = self.fi.get_filter_images("std", images)
-        self.I_lsq_eq = s2image.Image(lsq_image, self.xyz_grid)
-        self.I_std_eq = s2image.Image(std_image, self.xyz_grid)
-        self.I_lsq_eq_summed = s2image.Image(lsq_image.reshape(self.nlevel+1,lsq_image.shape[-2], lsq_image.shape[-1]).sum(axis = 0), self.xyz_grid)
-        self.I_std_eq_summed = s2image.Image(std_image.reshape(self.nlevel+1,std_image.shape[-2], std_image.shape[-1]).sum(axis = 0), self.xyz_grid)
+            self.I_lsq_eq = s2image.Image(self.lsq_image, self.xyz_grid)
+            self.I_std_eq = s2image.Image(self.std_image, self.xyz_grid)
+            self.I_lsq_eq_summed = s2image.Image(self.lsq_image.reshape(self.nlevel+1,self.lsq_image.shape[-2], self.lsq_image.shape[-1]).sum(axis = 0), self.xyz_grid)
+            self.I_std_eq_summed = s2image.Image(self.std_image.reshape(self.nlevel+1,self.std_image.shape[-2], self.std_image.shape[-1]).sum(axis = 0), self.xyz_grid)
 
-    
-        if save == True:
+            self.I_lsq_eq_summed.data = self.I_lsq_eq_summed.data / self.non_empty_cells
+            self.I_std_eq_summed.data = self.I_std_eq_summed.data / self.non_empty_cells
+            
+        if weighting == 'natural':
+        
+            self.imaging_psf(weighting, n)
+            images = self.imager.get().reshape((-1, self.npix, self.npix))
+            self.lsq_image = self.fi.get_filter_images("lsq", images)
+            self.std_image = self.fi.get_filter_images("std", images)
+            self.I_lsq_eq = s2image.Image(self.lsq_image, self.xyz_grid)
+            self.I_std_eq = s2image.Image(self.std_image, self.xyz_grid)
+            self.I_lsq_eq_summed = s2image.Image(self.lsq_image.reshape(self.nlevel+1,self.lsq_image.shape[-2], self.lsq_image.shape[-1]).sum(axis = 0), self.xyz_grid)
+            self.I_std_eq_summed = s2image.Image(self.std_image.reshape(self.nlevel+1,self.std_image.shape[-2], self.std_image.shape[-1]).sum(axis = 0), self.xyz_grid)
+            
+            
             self.save_fits()
-
-########################################################################################
+        
+        
+        
+        
+        
+        
+    def imaging_psf(self, weighting='uniform',n=1):
+            ###
+            if weighting == 'uniform':
+                print('Uniform weighting PSF')
+                print('du = ', self.du)
+                print('nbr non empty cells = ', self.non_empty_cells)
+                temp = 0
+                for t, f, S in ProgressBar(
+                        self.ms.visibilities(channel_id=self.channel_id, time_id=slice(self.timeStart, self.timeEnd, n), column=self.column)
+                ):
+                    
+                    wl = constants.speed_of_light / f.to_value(u.Hz)
+                    XYZ = self.ms.instrument(t)
+                    W = self.ms.beamformer(XYZ, wl)
+                    S, W = measurement_set.filter_data(S, W)
+            
+                    UVW_baselines_t = self.ms.instrument.baselines(t, uvw=True, field_center=self.ms.field_center)
+                    uvw = frame.reshape_and_scale_uvw(wl, UVW_baselines_t)
+                    if np.allclose(S.data, np.zeros(S.data.shape)):
+                        continue
+                    new_S = S.data.T.reshape(-1, order="F")
+                    ut, vt, wt = uvw.T
+                    w_okay = self.weighting(ut, vt, self.xedges, self.yedges, self.inv_counts)
+                    temp += np.sum(w_okay)
+                    new_S = np.full(new_S.shape, 1 + 0j)
+                    new_S = new_S*w_okay
+                    new_S = new_S.reshape((S.data.shape[0], S.data.shape[0]), order="F").T
+                    self.imager.collect(wl, self.fi, new_S, W.data, XYZ.data, uvw)
+                print('sum of the weights = ', temp)
+            ###
+            if weighting == 'natural':
+                    print('Natural weighting PSF')
+                    for t, f, S in ProgressBar(
+                            self.ms.visibilities(channel_id=self.channel_id, time_id=slice(self.timeStart, self.timeEnd, n), column=self.column)
+                    ):
+                        
+                        wl = constants.speed_of_light / f.to_value(u.Hz)
+                        XYZ = self.ms.instrument(t)
+                        W = self.ms.beamformer(XYZ, wl)
+                        S, W = measurement_set.filter_data(S, W)
+                
+                        UVW_baselines_t = self.ms.instrument.baselines(t, uvw=True, field_center=self.ms.field_center)
+                        uvw = frame.reshape_and_scale_uvw(wl, UVW_baselines_t)
+                        if np.allclose(S.data, np.zeros(S.data.shape)):
+                            continue
+                        self.imager.collect(wl, self.fi, np.full(S.shape, 1 + 0j, W.data, XYZ.data, uvw)
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
