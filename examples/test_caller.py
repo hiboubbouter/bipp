@@ -10,7 +10,7 @@ import bipp_custom_caller as bcc
 
 
 
-a = bcc(telescope="LOFAR", 
+a = bcc.bipp_custom(telescope="LOFAR", 
     ms_file="gauss4_t201806301100_SBL180.MS", 
     output="4Gauss_t1_sigma095", 
     npix=2000, 
