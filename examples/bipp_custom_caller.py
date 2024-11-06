@@ -119,10 +119,10 @@ class bipp_custom:
         if self.telescope.lower() == "skalow":
             self.ms = measurement_set.SKALowMeasurementSet(self.ms_file)
             self.N_station, self.N_antenna = 512, 512
-        elif self.telescope.lower() == "redundant":
-            self.ms = measurement_set.GenericMeasurementSet(self.ms_file)
-            self.N_station = self.ms.AntennaNumber()
-            self.N_antenna = self.N_station
+        #elif self.telescope.lower() == "redundant":
+        #    self.ms = measurement_set.GenericMeasurementSet(self.ms_file)
+        #    self.N_station = self.ms.AntennaNumber()
+        #    self.N_antenna = self.N_station
         elif self.telescope.lower() == "mwa":
             self.ms = measurement_set.MwaMeasurementSet(self.ms_file)
             self.N_station, self.N_antenna = 128, 128
